@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz PvP AI: Battle of Coins</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700;800&display=swap');
+        
+        body { 
+            font-family: 'Plus+Jakarta+Sans', sans-serif; 
+            background: #0f172a;
+            color: #f8fafc;
+            overflow-x: hidden; 
+        }
+
+        .glass { 
+            background: rgba(30, 41, 59, 0.7); 
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .ai-gradient {
+            background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+        }
+
+        .ai-glow {
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+        }
+
+        .scanning-line {
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #6366f1, transparent);
+            position: absolute;
+            width: 100%;
+            top: 0;
+            animation: scan 2s linear infinite;
+        }
+
+        @keyframes scan {
+            0% { top: 0; }
+            100% { top: 100%; }
+        }
+
+        .card-anim { animation: fadeInScale 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        @keyframes fadeInScale {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #6366f1;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .timer-progress {
+            transition: width 1s linear;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <!-- Background Decoration -->
+    <div class="fixed top-0 left-0 w-full h-full -z-10 overflow-hidden">
+        <div class="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-900/20 rounded-full blur-[120px]"></div>
+        <div class="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-pink-900/20 rounded-full blur-[120px]"></div>
+    </div>
+
+    <div class="max-w-xl w-full">
+        
+        <!-- SCREEN 1: SETUP -->
+        <div id="setup-screen" class="glass rounded-[2.5rem] p-10 shadow-2xl card-anim border border-white/10">
+            <div class="text-center mb-10">
+                <div class="inline-flex items-center justify-center p-5 ai-gradient rounded-3xl mb-6 ai-glow">
+                    <i class="fas fa-coins text-4xl text-white"></i>
+                </div>
+                <h1 class="text-4xl font-extrabold tracking-tight">Quiz PvP <span class="text-indigo-400">AI</span></h1>
+                <p class="text-slate-400 mt-2">Menang: +10 Koin | Salah/Waktu Habis: -5 Koin</p>
+            </div>
+            
+            <div class="space-y-5 mb-10">
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-2">
+                        <label class="text-xs font-bold text-indigo-400 uppercase tracking-widest ml-1">Pemain 1</label>
+                        <input type="text" id="p1-name-input" value="Player One" class="w-full bg-slate-800/50 border border-slate-700 px-5 py-4 rounded-2xl focus:border-indigo-500 outline-none transition text-white">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-xs font-bold text-pink-400 uppercase tracking-widest ml-1">Pemain 2</label>
+                        <input type="text" id="p2-name-input" value="Player Two" class="w-full bg-slate-800/50 border border-slate-700 px-5 py-4 rounded-2xl focus:border-pink-500 outline-none transition text-white">
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <label class="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Jumlah Ronde</label>
+                    <select id="round-select" class="w-full bg-slate-800/50 border border-slate-700 px-5 py-4 rounded-2xl outline-none text-white appearance-none cursor-pointer">
+                        <option value="3">3 Ronde (Singkat)</option>
+                        <option value="5" selected>5 Ronde (Normal)</option>
+                        <option value="10">10 Ronde (Maraton)</option>
+                    </select>
+                </div>
+                <div class="space-y-2">
+                    <label class="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Kategori AI</label>
+                    <select id="category-select" class="w-full bg-slate-800/50 border border-slate-700 px-5 py-4 rounded-2xl outline-none text-white appearance-none cursor-pointer">
+                        <option value="general">Pengetahuan Umum</option>
+                        <option value="science">Sains & Teknologi</option>
+                        <option value="history">Sejarah Dunia</option>
+                        <option value="pop">Pop Culture</option>
+                    </select>
+                </div>
+            </div>
+
+            <button onclick="startGame()" class="w-full ai-gradient hover:opacity-90 text-white font-black py-5 rounded-2xl shadow-xl transition transform hover:-translate-y-1 active:scale-95 text-lg tracking-wide uppercase">
+                Mulai Pertandingan
+            </button>
+        </div>
+
+        <!-- SCREEN 2: AI GENERATING (LOADING) -->
+        <div id="loading-screen" class="hidden glass rounded-[2.5rem] p-12 shadow-2xl text-center card-anim overflow-hidden relative">
+            <div class="scanning-line"></div>
+            <div class="relative z-10">
+                <div class="loader mx-auto mb-8"></div>
+                <h2 class="text-2xl font-bold mb-2">AI Menyiapkan Pertanyaan...</h2>
+                <p class="text-slate-400">Siap-siap <span id="current-player-turn" class="text-indigo-400 font-bold">Pemain</span>!</p>
+            </div>
+        </div>
+
+        <!-- SCREEN 3: ANSWERING -->
+        <div id="answering-screen" class="hidden glass rounded-[2.5rem] p-10 shadow-2xl card-anim">
+            <div class="flex justify-between items-start mb-6">
+                <div>
+                    <p class="text-xs font-bold text-slate-500 uppercase tracking-[0.2em] mb-1">Giliran Menjawab:</p>
+                    <h2 id="answerer-name" class="text-2xl font-black text-white">Nama Pemain</h2>
+                    <p id="current-coins" class="text-sm font-bold text-yellow-500"><i class="fas fa-coins mr-1"></i> Koin: 0</p>
+                </div>
+                <div class="text-right">
+                    <div class="ai-gradient text-white px-5 py-2 rounded-2xl text-sm font-black shadow-lg mb-2">
+                        RONDE <span id="current-round-display">1</span>
+                    </div>
+                    <div class="flex items-center justify-end text-rose-500 font-bold">
+                        <i class="fas fa-clock mr-2"></i>
+                        <span id="timer-text" class="text-xl">10</span>s
+                    </div>
+                </div>
+            </div>
+
+            <!-- Timer Progress Bar -->
+            <div class="w-full bg-slate-800 h-2 rounded-full mb-8 overflow-hidden">
+                <div id="timer-bar" class="h-full bg-indigo-500 timer-progress" style="width: 100%"></div>
+            </div>
+
+            <div class="relative p-8 bg-slate-900/50 rounded-3xl mb-10 border border-indigo-500/30 min-h-[160px] flex items-center justify-center text-center">
+                <i class="fas fa-quote-left absolute top-4 left-4 text-slate-700 text-2xl"></i>
+                <h3 id="display-question" class="text-xl md:text-2xl font-semibold text-slate-100 leading-relaxed">
+                    "Memuat pertanyaan AI..."
+                </h3>
+            </div>
+
+            <div class="grid grid-cols-2 gap-6">
+                <button onclick="checkAnswer(true)" class="group bg-emerald-500/10 hover:bg-emerald-500 border-2 border-emerald-500/50 text-emerald-500 hover:text-white font-bold py-6 rounded-3xl transition-all transform active:scale-95 shadow-lg">
+                    <i class="fas fa-check-circle text-3xl mb-2 block"></i>
+                    <span class="text-lg">BENAR</span>
+                </button>
+                <button onclick="checkAnswer(false)" class="group bg-rose-500/10 hover:bg-rose-500 border-2 border-rose-500/50 text-rose-500 hover:text-white font-bold py-6 rounded-3xl transition-all transform active:scale-95 shadow-lg">
+                    <i class="fas fa-times-circle text-3xl mb-2 block"></i>
+                    <span class="text-lg">SALAH</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- SCREEN 4: RESULTS -->
+        <div id="result-screen" class="hidden glass rounded-[2.5rem] p-10 shadow-2xl text-center card-anim">
+            <h2 class="text-4xl font-black text-white mb-10 tracking-tight">Hasil Koin Akhir</h2>
+            
+            <div class="grid grid-cols-2 gap-6 mb-10">
+                <div class="p-6 bg-indigo-500/10 rounded-3xl border border-indigo-500/20">
+                    <p id="res-p1-name" class="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-2">Pemain 1</p>
+                    <div class="flex items-center justify-center">
+                        <i class="fas fa-coins text-yellow-500 mr-2 text-2xl"></i>
+                        <p id="res-p1-score" class="text-5xl font-black text-white">0</p>
+                    </div>
+                </div>
+                <div class="p-6 bg-pink-500/10 rounded-3xl border border-pink-500/20">
+                    <p id="res-p2-name" class="text-xs font-bold text-pink-400 uppercase tracking-widest mb-2">Pemain 2</p>
+                    <div class="flex items-center justify-center">
+                        <i class="fas fa-coins text-yellow-500 mr-2 text-2xl"></i>
+                        <p id="res-p2-score" class="text-5xl font-black text-white">0</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="winner-banner" class="mb-10 py-6 px-8 ai-gradient rounded-3xl shadow-2xl transform scale-105">
+                <i class="fas fa-crown text-yellow-300 text-4xl mb-3"></i>
+                <h3 id="winner-text" class="text-2xl font-black text-white">Player One Menang!</h3>
+            </div>
+
+            <button onclick="location.reload()" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-5 rounded-2xl transition border border-slate-600">
+                <i class="fas fa-redo-alt mr-2"></i> Main Lagi
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        const AI_DATABASE = {
+            general: [
+                { q: "Matahari sebenarnya adalah sebuah bintang.", a: true },
+                { q: "Australia adalah satu-satunya benua yang juga sebuah negara.", a: true },
+                { q: "Pinguin bisa ditemukan secara alami di Kutub Utara.", a: false },
+                { q: "Benua terbesar di dunia adalah Afrika.", a: false },
+                { q: "Ibukota dari negara Brazil adalah Rio de Janeiro.", a: false },
+                { q: "Emas adalah logam yang tidak bisa berkarat.", a: true },
+                { q: "Madu adalah satu-satunya makanan yang tidak pernah kadaluarsa.", a: true }
+            ],
+            science: [
+                { q: "Air mendidih pada suhu 90 derajat Celcius di permukaan laut.", a: false },
+                { q: "Suara merambat lebih cepat di air daripada di udara.", a: true },
+                { q: "Manusia memiliki 4 ginjal secara alami.", a: false },
+                { q: "Planet terdekat dengan Matahari adalah Merkurius.", a: true },
+                { q: "Cahaya merambat dengan kecepatan sekitar 300.000 km per detik.", a: true },
+                { q: "Berlian terbuat dari karbon.", a: true }
+            ],
+            history: [
+                { q: "Perang Dunia II berakhir pada tahun 1945.", a: true },
+                { q: "Napoleon Bonaparte berasal dari Italia.", a: false },
+                { q: "Tembok Besar China dibangun dalam waktu satu tahun.", a: false },
+                { q: "Negara Indonesia merdeka pada tanggal 17 Agustus 1945.", a: true },
+                { q: "Piramida Giza terletak di Mesir.", a: true }
+            ],
+            pop: [
+                { q: "Mickey Mouse awalnya memiliki nama Mortimer.", a: true },
+                { q: "Film Avatar (2009) disutradarai oleh Steven Spielberg.", a: false },
+                { q: "Spider-Man adalah karakter dari komik DC.", a: false },
+                { q: "Batman tidak memiliki kekuatan super alami.", a: true },
+                { q: "Iron Man adalah bagian dari Avengers.", a: true }
+            ]
+        };
+
+        let gameData = {
+            p1Name: "",
+            p2Name: "",
+            p1Coins: 0,
+            p2Coins: 0,
+            currentRound: 1,
+            maxRounds: 5,
+            currentPlayer: 1,
+            category: "general",
+            currentQuestion: null,
+            usedQuestions: [],
+            timeLeft: 10,
+            timerInterval: null
+        };
+
+        function startGame() {
+            gameData.p1Name = document.getElementById('p1-name-input').value || "Pemain 1";
+            gameData.p2Name = document.getElementById('p2-name-input').value || "Pemain 2";
+            gameData.maxRounds = parseInt(document.getElementById('round-select').value);
+            gameData.category = document.getElementById('category-select').value;
+            
+            generateAIQuestion();
+        }
+
+        function generateAIQuestion() {
+            showScreen('loading-screen');
+            document.getElementById('current-player-turn').innerText = gameData.currentPlayer === 1 ? gameData.p1Name : gameData.p2Name;
+
+            setTimeout(() => {
+                const pool = AI_DATABASE[gameData.category];
+                let randomIdx;
+                
+                do {
+                    randomIdx = Math.floor(Math.random() * pool.length);
+                } while (gameData.usedQuestions.includes(gameData.category + randomIdx) && gameData.usedQuestions.length < pool.length);
+
+                if (gameData.usedQuestions.length >= pool.length) gameData.usedQuestions = [];
+
+                gameData.usedQuestions.push(gameData.category + randomIdx);
+                gameData.currentQuestion = pool[randomIdx];
+                
+                displayQuestion();
+            }, 1200);
+        }
+
+        function displayQuestion() {
+            document.getElementById('answerer-name').innerText = gameData.currentPlayer === 1 ? gameData.p1Name : gameData.p2Name;
+            document.getElementById('current-coins').innerText = `Koin: ${gameData.currentPlayer === 1 ? gameData.p1Coins : gameData.p2Coins}`;
+            document.getElementById('display-question').innerText = `"${gameData.currentQuestion.q}"`;
+            document.getElementById('current-round-display').innerText = gameData.currentRound;
+            
+            const container = document.getElementById('answering-screen');
+            container.style.borderLeft = gameData.currentPlayer === 1 ? "8px solid #6366f1" : "8px solid #ec4899";
+
+            showScreen('answering-screen');
+            startTimer();
+        }
+
+        function startTimer() {
+            gameData.timeLeft = 10;
+            updateTimerUI();
+            
+            clearInterval(gameData.timerInterval);
+            gameData.timerInterval = setInterval(() => {
+                gameData.timeLeft--;
+                updateTimerUI();
+                
+                if (gameData.timeLeft <= 0) {
+                    clearInterval(gameData.timerInterval);
+                    checkAnswer(null); // Timeout considered wrong
+                }
+            }, 1000);
+        }
+
+        function updateTimerUI() {
+            const timerBar = document.getElementById('timer-bar');
+            const timerText = document.getElementById('timer-text');
+            const percentage = (gameData.timeLeft / 10) * 100;
+            
+            timerBar.style.width = percentage + '%';
+            timerText.innerText = gameData.timeLeft;
+            
+            if (gameData.timeLeft <= 3) {
+                timerBar.classList.replace('bg-indigo-500', 'bg-rose-500');
+            } else {
+                timerBar.classList.replace('bg-rose-500', 'bg-indigo-500');
+            }
+        }
+
+        function checkAnswer(userChoice) {
+            clearInterval(gameData.timerInterval);
+            
+            let isCorrect = userChoice === gameData.currentQuestion.a;
+            let resultMsg = "";
+
+            if (userChoice === null) {
+                resultMsg = "Waktu Habis! Koin -5";
+                deductCoins();
+            } else if (isCorrect) {
+                resultMsg = "BENAR! Koin +10";
+                addCoins();
+            } else {
+                resultMsg = "SALAH! Koin -5. Jawaban benar: " + (gameData.currentQuestion.a ? "BENAR" : "SALAH");
+                deductCoins();
+            }
+
+            alert(resultMsg);
+            nextTurn();
+        }
+
+        function addCoins() {
+            if (gameData.currentPlayer === 1) gameData.p1Coins += 10;
+            else gameData.p2Coins += 10;
+        }
+
+        function deductCoins() {
+            if (gameData.currentPlayer === 1) gameData.p1Coins = Math.max(0, gameData.p1Coins - 5);
+            else gameData.p2Coins = Math.max(0, gameData.p2Coins - 5);
+        }
+
+        function nextTurn() {
+            if (gameData.currentPlayer === 1) {
+                gameData.currentPlayer = 2;
+                generateAIQuestion();
+            } else {
+                if (gameData.currentRound < gameData.maxRounds) {
+                    gameData.currentRound++;
+                    gameData.currentPlayer = 1;
+                    generateAIQuestion();
+                } else {
+                    endGame();
+                }
+            }
+        }
+
+        function endGame() {
+            showScreen('result-screen');
+            document.getElementById('res-p1-name').innerText = gameData.p1Name;
+            document.getElementById('res-p2-name').innerText = gameData.p2Name;
+            document.getElementById('res-p1-score').innerText = gameData.p1Coins;
+            document.getElementById('res-p2-score').innerText = gameData.p2Coins;
+
+            let winText = "";
+            if (gameData.p1Coins > gameData.p2Coins) {
+                winText = `${gameData.p1Name} PEMENANGNYA!`;
+            } else if (gameData.p2Coins > gameData.p1Coins) {
+                winText = `${gameData.p2Name} PEMENANGNYA!`;
+            } else {
+                winText = "HASIL SERI! Skor Koin Sama.";
+            }
+            document.getElementById('winner-text').innerText = winText;
+        }
+
+        function showScreen(screenId) {
+            ['setup-screen', 'loading-screen', 'answering-screen', 'result-screen'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+            document.getElementById(screenId).classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
